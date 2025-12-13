@@ -56,9 +56,9 @@ export default function ChatPage() {
         }
 
         // Load chat history
-        loadChatHistory();
+        //loadChatHistory();
         // Load documents
-        loadDocuments();
+        //loadDocuments();
     }, [router]);
 
     useEffect(() => {
@@ -121,7 +121,7 @@ export default function ChatPage() {
         setDocuments(prev => [...prev, tempDoc]);
 
         try {
-            const response = await fetch('/api/upload', {
+            const response = await fetch('http://127.0.0.1:5000/upload_file', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -132,17 +132,17 @@ export default function ChatPage() {
             const data = await response.json();
 
             if (response.ok) {
-                // Update document with real ID and processing status
+                // Update document with real ID and mark as ready
                 setDocuments(prev =>
                     prev.map(doc =>
                         doc.id === tempDoc.id
-                            ? { ...doc, id: data.doc_id, status: 'processing', progress: 50 }
+                            ? { ...doc, id: data.doc_id, status: 'ready', progress: 100 }
                             : doc
                     )
                 );
 
-                // Poll for processing status
-                pollUploadStatus(data.job_id, data.doc_id);
+                // TODO: Implement polling when backend processing is ready
+                // pollUploadStatus(data.job_id, data.doc_id);
             } else {
                 // Update to error status
                 setDocuments(prev =>
