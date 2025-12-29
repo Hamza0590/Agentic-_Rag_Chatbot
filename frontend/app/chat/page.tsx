@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import ReactMarkdown from 'react-markdown';
 import './chat.css';
 
 interface Message {
@@ -124,7 +125,8 @@ export default function ChatPage() {
             const response = await fetch('http://127.0.0.1:5000/upload_file', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+                    'email': localStorage.getItem('user') || ''
                 },
                 body: formData,
             });
@@ -216,11 +218,12 @@ export default function ChatPage() {
         setIsLoading(true);
 
         try {
-            const response = await fetch('/api/query', {
+            const response = await fetch('http://127.0.0.1:5000/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'email': localStorage.getItem('email')
                 },
                 body: JSON.stringify({
                     query: userMessage.content,
@@ -235,7 +238,7 @@ export default function ChatPage() {
                 const assistantMessage: Message = {
                     id: data.answer_id || `msg-${Date.now()}-assistant`,
                     role: 'assistant',
-                    content: data.answer_text,
+                    content: data.answer,
                     citations: data.citations,
                     timestamp: new Date(),
                 };
@@ -263,10 +266,27 @@ export default function ChatPage() {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-        router.push('/');
+    const handleLogout = async () => {
+        try {
+            // Call backend logout endpoint
+            await fetch('http://127.0.0.1:5000/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+                },
+                body: JSON.stringify({
+                    email: localStorage.getItem('email') || '',
+                }),
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            // Clear local storage regardless of backend response
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            router.push('/');
+        }
     };
 
     const handleNewChat = () => {
@@ -420,7 +440,9 @@ export default function ChatPage() {
                                         )}
                                     </div>
                                     <div className="message-content">
-                                        <div className="message-text">{message.content}</div>
+                                        <div className="message-text">
+                                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                                        </div>
                                         {message.citations && message.citations.length > 0 && (
                                             <div className="citations">
                                                 <button

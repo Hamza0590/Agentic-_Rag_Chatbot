@@ -18,9 +18,11 @@ db = SQLAlchemy(chat_app)
 # Import and register blueprints
 from app.routes.upload import upload_bp
 from app.routes.auth import auth_bp
+from app.routes.chat import chat_bp
 
 chat_app.register_blueprint(upload_bp)
 chat_app.register_blueprint(auth_bp)
+chat_app.register_blueprint(chat_bp)
 
 # Create database tables
 with chat_app.app_context():

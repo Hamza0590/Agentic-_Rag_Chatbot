@@ -33,11 +33,9 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Store user data in localStorage or session
-        localStorage.setItem('user', JSON.stringify(data));
-        localStorage.setItem('token', data.token);
-
-        // Redirect to chat page
+        localStorage.setItem('user', data.email || email);  // Fallback to input email
+        localStorage.setItem('email', email);
+        localStorage.setItem('token', data.token || 'temp-token');
         router.push('/chat');
       } else {
         setError(data.message || 'Invalid credentials. Please try again.');
