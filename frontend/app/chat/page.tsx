@@ -59,7 +59,7 @@ export default function ChatPage() {
         // Load chat history
         //loadChatHistory();
         // Load documents
-        //loadDocuments();
+        loadDocuments();
     }, [router]);
 
     useEffect(() => {
@@ -88,14 +88,16 @@ export default function ChatPage() {
 
     const loadDocuments = async () => {
         try {
-            const response = await fetch('/api/documents', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                },
-            });
-            const data = await response.json();
-            if (response.ok) {
-                setDocuments(data.documents);
+            // Load from localStorage
+            const savedDocs = localStorage.getItem('uploadedDocuments');
+            if (savedDocs) {
+                const parsedDocs = JSON.parse(savedDocs);
+                // Convert timestamp strings back to Date objects
+                const docsWithDates = parsedDocs.map((doc: any) => ({
+                    ...doc,
+                    uploadTime: new Date(doc.uploadTime)
+                }));
+                setDocuments(docsWithDates);
             }
         } catch (error) {
             console.error('Error loading documents:', error);
@@ -121,30 +123,53 @@ export default function ChatPage() {
         };
         setDocuments(prev => [...prev, tempDoc]);
 
-        try {
-            const response = await fetch('http://127.0.0.1:5000/upload_file', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-                    'email': localStorage.getItem('user') || ''
-                },
-                body: formData,
-            });
+        // Use XMLHttpRequest for progress tracking
+        const xhr = new XMLHttpRequest();
 
-            const data = await response.json();
-
-            if (response.ok) {
-                // Update document with real ID and mark as ready
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+                const percentComplete = Math.round((event.loaded / event.total) * 100);
                 setDocuments(prev =>
                     prev.map(doc =>
                         doc.id === tempDoc.id
-                            ? { ...doc, id: data.doc_id, status: 'ready', progress: 100 }
+                            ? { ...doc, progress: percentComplete }
                             : doc
                     )
                 );
+            }
+        });
 
-                // TODO: Implement polling when backend processing is ready
-                // pollUploadStatus(data.job_id, data.doc_id);
+        // Handle completion
+        xhr.addEventListener('load', () => {
+            if (xhr.status === 200) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    const finalDoc: Document = {
+                        id: data.doc_id,
+                        title: file.name,
+                        status: 'ready',
+                        progress: 100,
+                        uploadTime: new Date(),
+                    };
+
+                    // Update document with real ID and mark as ready
+                    setDocuments(prev => {
+                        const updated = prev.map(doc =>
+                            doc.id === tempDoc.id ? finalDoc : doc
+                        );
+                        // Save to localStorage
+                        localStorage.setItem('uploadedDocuments', JSON.stringify(updated));
+                        return updated;
+                    });
+                } catch (error) {
+                    console.error('Error parsing response:', error);
+                    setDocuments(prev =>
+                        prev.map(doc =>
+                            doc.id === tempDoc.id ? { ...doc, status: 'error', progress: 0 } : doc
+                        )
+                    );
+                }
             } else {
                 // Update to error status
                 setDocuments(prev =>
@@ -153,13 +178,27 @@ export default function ChatPage() {
                     )
                 );
             }
-        } catch (error) {
-            console.error('Upload error:', error);
+        });
+
+        // Handle errors
+        xhr.addEventListener('error', () => {
+            console.error('Upload error');
             setDocuments(prev =>
                 prev.map(doc =>
                     doc.id === tempDoc.id ? { ...doc, status: 'error', progress: 0 } : doc
                 )
             );
+        });
+
+        // Send the request
+        xhr.open('POST', 'http://127.0.0.1:5000/upload_file');
+        xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token') || ''}`);
+        xhr.setRequestHeader('email', localStorage.getItem('user') || '');
+        xhr.send(formData);
+
+        // Reset file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
     };
 
@@ -289,6 +328,49 @@ export default function ChatPage() {
         }
     };
 
+    const handleDeleteDocument = async (docId: string) => {
+        // Find the document to get its filename
+        const docToDelete = documents.find(doc => doc.id === docId);
+        if (!docToDelete) return;
+
+        // Confirm deletion
+        if (!confirm(`Are you sure you want to delete "${docToDelete.title}"?`)) {
+            return;
+        }
+
+        try {
+            // Call backend API to delete vectors
+            const response = await fetch('http://127.0.0.1:5000/delete_document', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+                    'email': localStorage.getItem('user') || ''
+                },
+                body: JSON.stringify({
+                    filename: docToDelete.title
+                }),
+            });
+
+            if (response.ok) {
+                // Remove from state and localStorage
+                setDocuments(prev => {
+                    const updated = prev.filter(doc => doc.id !== docId);
+                    localStorage.setItem('uploadedDocuments', JSON.stringify(updated));
+                    return updated;
+                });
+                console.log(`Successfully deleted ${docToDelete.title}`);
+            } else {
+                const errorData = await response.json();
+                console.error('Error deleting document:', errorData);
+                alert(`Failed to delete document: ${errorData.error || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Error calling delete API:', error);
+            alert('Failed to delete document. Please try again.');
+        }
+    };
+
     const handleNewChat = () => {
         setMessages([]);
         setSelectedChat(null);
@@ -378,6 +460,17 @@ export default function ChatPage() {
                                         </div>
                                     )}
                                 </div>
+                                {doc.status === 'ready' && (
+                                    <button
+                                        className="delete-doc-btn"
+                                        onClick={() => handleDeleteDocument(doc.id)}
+                                        title="Delete document"
+                                    >
+                                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                )}
                             </div>
                         ))}
                     </div>
