@@ -14,7 +14,7 @@ from langchain_pinecone import PineconeVectorStore
 from app.routes.upload import pc
 
 load_dotenv()
-os.environ['GROQ_API_KEY'] = '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'
+os.environ['GROQ_API_KEY'] = os.getenv("GROQ_API_KEY")
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 vectorstore = PineconeVectorStore(
     index=pc.Index("books-index"),
@@ -52,7 +52,7 @@ def search_pdfs(query: str):
         query: The user's question or search term to find in the PDFs
     """
     global user_email
-    print("User_email: ", user_email)
+
     k_res = vectorstore.similarity_search(query, k=20, filter={"session_id": user_email})  
     text = [doc.page_content for doc in k_res]
     return text
@@ -60,7 +60,7 @@ def search_pdfs(query: str):
 tools=[search_ddgo, search_pdfs]
 
 def chat(chat_state: chatState):
-    llm = ChatGroq(model="moonshotai/kimi-k2-instruct-0905")
+    llm = ChatGroq(model="openai/gpt-oss-120b")
     llm_with_tools = llm.bind_tools(tools)
     response = llm_with_tools.invoke(chat_state["messages"])
     return {"messages": [response]}   

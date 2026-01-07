@@ -1,0 +1,38 @@
+# Flask Framework
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-SQLAlchemy==3.1.1
+
+# Database
+SQLAlchemy==2.0.23
+
+# PDF Processing
+pdfplumber==0.11.0
+
+# LangChain & AI
+langchain-core==0.3.28
+langchain-community==0.3.13
+langchain-groq==0.2.1
+langchain-huggingface==0.1.2
+langchain-pinecone==0.2.0
+
+# LangGraph
+langgraph==0.2.59
+
+# Vector Store
+pinecone-client==5.0.1
+
+# Embeddings
+sentence-transformers==3.3.1
+
+# Tokenization
+tiktoken==0.8.0
+
+# Search
+duckduckgo-search==6.3.5
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Utilities
+Werkzeug==3.0.1

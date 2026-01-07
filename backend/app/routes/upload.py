@@ -173,3 +173,44 @@ def upload_file():
         'job_id': f'job_{int(__import__("time").time())}',
         'message': 'File uploaded successfully'
     }), 200
+
+
+@upload_bp.route('/delete_document', methods=['DELETE'])
+def delete_document():
+    """
+    Delete all vectors associated with a specific document from Pinecone.
+    Filters by both filename (source) and user email (session_id).
+    """
+    try:
+        # Get user email from headers
+        email = request.headers.get('email')
+        if not email or email == 'null':
+            return jsonify({'error': 'User authentication required'}), 401
+        
+        # Get filename from request body
+        data = request.get_json()
+        filename = data.get('filename')
+        
+        if not filename:
+            return jsonify({'error': 'Filename is required'}), 400
+        
+        # Get Pinecone index
+        index = pc.Index("books-index")
+        
+        # Delete vectors with matching source and session_id
+        # Pinecone delete by metadata filter
+        index.delete(
+            filter={
+                "source": {"$eq": filename},
+                "session_id": {"$eq": str(email)}
+            }
+        )
+        
+        return jsonify({
+            'message': f'Successfully deleted all vectors for {filename}',
+            'filename': filename
+        }), 200
+        
+    except Exception as e:
+        print(f"Error deleting document: {str(e)}")
+        return jsonify({'error': f'Failed to delete document: {str(e)}'}), 500
